@@ -1,0 +1,5 @@
+C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Debug\D3D12\D3D12Core.dll
+C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Debug\D3D12\D3D12Core.pdb
+C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Debug\D3D12\D3D12SDKLayers.dll
+C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Debug\D3D12\D3D12SDKLayers.pdb
+C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Debug\DiseaseSim.exe
