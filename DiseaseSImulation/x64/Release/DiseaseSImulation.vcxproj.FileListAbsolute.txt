@@ -3,3 +3,8 @@ C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Release\D3D12\D3D12C
 C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Release\D3D12\D3D12Core.pdb
 C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Release\D3D12\D3D12SDKLayers.dll
 C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Release\D3D12\D3D12SDKLayers.pdb
+D:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Release\D3D12\D3D12Core.dll
+D:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Release\D3D12\D3D12Core.pdb
+D:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Release\D3D12\D3D12SDKLayers.dll
+D:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Release\D3D12\D3D12SDKLayers.pdb
+D:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Release\DiseaseSim.exe

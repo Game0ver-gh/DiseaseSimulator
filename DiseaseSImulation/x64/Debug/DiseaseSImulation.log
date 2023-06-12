@@ -1,2 +1,10 @@
-﻿  Window.cpp
-  DiseaseSImulation.vcxproj -> C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Debug\DiseaseSim.exe
+﻿  DiseaseSim.cpp
+  DiseaseSimulator.cpp
+D:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\DiseaseSimulator.cpp(471,69): warning C4267: "argument": konwersja z "size_t" do "int", możliwa utrata danych
+D:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\DiseaseSimulator.cpp(473,69): warning C4267: "argument": konwersja z "size_t" do "int", możliwa utrata danych
+D:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\DiseaseSimulator.cpp(475,70): warning C4267: "argument": konwersja z "size_t" do "int", możliwa utrata danych
+D:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\DiseaseSimulator.cpp(477,65): warning C4267: "argument": konwersja z "size_t" do "int", możliwa utrata danych
+D:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\DiseaseSimulator.cpp(479,65): warning C4267: "argument": konwersja z "size_t" do "int", możliwa utrata danych
+D:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\DiseaseSimulator.cpp(481,68): warning C4267: "argument": konwersja z "size_t" do "int", możliwa utrata danych
+  Generowanie kodu...
+  DiseaseSImulation.vcxproj -> D:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Debug\DiseaseSim.exe

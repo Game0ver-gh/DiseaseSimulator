@@ -2,16 +2,33 @@
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_win32.h"
 #include "imgui/imgui_impl_dx12.h"
+#include "imgui/implot.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-Window::~Window()
+struct FrameContext
 {
-    WaitForLastSubmittedFrame();
-    CleanupImGui();
-    CleanupDeviceD3D();
-    DestroyMainWindow();
-}
+    ID3D12CommandAllocator*             CommandAllocator;
+    UINT64                              FenceValue;
+};
+
+static constexpr int                    NUM_FRAMES_IN_FLIGHT = 3;
+static constexpr int                    NUM_BACK_BUFFERS = 3;
+static HWND							    m_hWnd;
+static FrameContext					    g_frameContext[3] = {};
+static UINT							    g_frameIndex = 0;
+static ID3D12Device*                    g_pd3dDevice = nullptr;
+static ID3D12DescriptorHeap*            g_pd3dRtvDescHeap = nullptr;
+static ID3D12DescriptorHeap*            g_pd3dSrvDescHeap = nullptr;
+static ID3D12CommandQueue*              g_pd3dCommandQueue = nullptr;
+static ID3D12GraphicsCommandList*       g_pd3dCommandList = nullptr;
+static ID3D12Fence*                     g_fence = nullptr;
+static HANDLE							g_fenceEvent = nullptr;
+static UINT64							g_fenceLastSignaledValue = 0;
+static IDXGISwapChain3*                 g_pSwapChain = nullptr;
+static HANDLE							g_hSwapChainWaitableObject = nullptr;
+static ID3D12Resource*                  g_mainRenderTargetResource[3] = {};
+static D3D12_CPU_DESCRIPTOR_HANDLE		g_mainRenderTargetDescriptor[3] = {};
 
 bool Window::CreateMainWindow()
 {
@@ -25,17 +42,17 @@ bool Window::CreateMainWindow()
 
     ::RegisterClassExW(&wc);
 
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    ImVec2 windowPos = { (float)(screenWidth - m_size.x) / 2.f, (float)(screenHeight - m_size.y) / 2.f };
+
     m_hWnd = ::CreateWindowW(
         wc.lpszClassName, m_name.c_str(), WS_OVERLAPPEDWINDOW, 
-        m_pos.x, m_pos.y, m_size.x, m_size.y, 
+        (int)windowPos.x, (int)windowPos.y, (int)m_size.x, (int)m_size.y,
         nullptr, nullptr, wc.hInstance, nullptr);
 
     if (!CreateDeviceD3D())
-    {
-        DestroyMainWindow();
         throw std::runtime_error("Failed to create device");
-        return false;
-    }
 
     ::ShowWindow(m_hWnd, SW_SHOWDEFAULT);
     ::UpdateWindow(m_hWnd);
@@ -45,12 +62,13 @@ bool Window::CreateMainWindow()
 void Window::DestroyMainWindow()
 {
     CleanupDeviceD3D();
+    ::DestroyWindow(m_hWnd);
 	::UnregisterClassW(m_name.c_str(), ::GetModuleHandle(nullptr));
 }
 
-void Window::CreateRenderTarget()
+void CreateRenderTarget()
 {
-    for (UINT i = 0; i < 3; i++)
+    for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
     {
         ID3D12Resource* pBackBuffer = nullptr;
         g_pSwapChain->GetBuffer(i, IID_PPV_ARGS(&pBackBuffer));
@@ -59,17 +77,9 @@ void Window::CreateRenderTarget()
     }
 }
 
-void Window::CleanupRenderTarget()
+void WaitForLastSubmittedFrame()
 {
-    WaitForLastSubmittedFrame();
-
-    for (UINT i = 0; i < 3; i++)
-        if (g_mainRenderTargetResource[i]) { g_mainRenderTargetResource[i]->Release(); g_mainRenderTargetResource[i] = nullptr; }
-}
-
-void Window::WaitForLastSubmittedFrame()
-{
-    FrameContext* frameCtx = &g_frameContext[g_frameIndex % 3];
+    FrameContext* frameCtx = &g_frameContext[g_frameIndex % NUM_FRAMES_IN_FLIGHT];
 
     UINT64 fenceValue = frameCtx->FenceValue;
     if (fenceValue == 0)
@@ -83,7 +93,15 @@ void Window::WaitForLastSubmittedFrame()
     WaitForSingleObject(g_fenceEvent, INFINITE);
 }
 
-Window::FrameContext* Window::WaitForNextFrameResources()
+void CleanupRenderTarget()
+{
+    WaitForLastSubmittedFrame();
+
+    for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
+        if (g_mainRenderTargetResource[i]) { g_mainRenderTargetResource[i]->Release(); g_mainRenderTargetResource[i] = nullptr; }
+}
+
+FrameContext* WaitForNextFrameResources()
 {
     UINT nextFrameIndex = g_frameIndex + 1;
     g_frameIndex = nextFrameIndex;
@@ -91,7 +109,7 @@ Window::FrameContext* Window::WaitForNextFrameResources()
     HANDLE waitableObjects[] = { g_hSwapChainWaitableObject, nullptr };
     DWORD numWaitableObjects = 1;
 
-    FrameContext* frameCtx = &g_frameContext[nextFrameIndex % 3];
+    FrameContext* frameCtx = &g_frameContext[nextFrameIndex % NUM_FRAMES_IN_FLIGHT];
     UINT64 fenceValue = frameCtx->FenceValue;
     if (fenceValue != 0) // means no fence was signaled
     {
@@ -110,6 +128,7 @@ void Window::InitImGui()
 {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    ImPlot::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
@@ -133,10 +152,11 @@ void Window::CleanupImGui()
 
 bool Window::CreateDeviceD3D()
 {
+    // Setup swap chain
     DXGI_SWAP_CHAIN_DESC1 sd;
     {
         ZeroMemory(&sd, sizeof(sd));
-        sd.BufferCount = 3;
+        sd.BufferCount = NUM_BACK_BUFFERS;
         sd.Width = 0;
         sd.Height = 0;
         sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -173,13 +193,13 @@ bool Window::CreateDeviceD3D()
         pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
         pInfoQueue->Release();
         pdx12Debug->Release();
-    }
+}
 #endif
 
     {
         D3D12_DESCRIPTOR_HEAP_DESC desc = {};
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-        desc.NumDescriptors = 3;
+        desc.NumDescriptors = NUM_BACK_BUFFERS;
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         desc.NodeMask = 1;
         if (g_pd3dDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&g_pd3dRtvDescHeap)) != S_OK)
@@ -187,7 +207,7 @@ bool Window::CreateDeviceD3D()
 
         SIZE_T rtvDescriptorSize = g_pd3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = g_pd3dRtvDescHeap->GetCPUDescriptorHandleForHeapStart();
-        for (UINT i = 0; i < 3; i++)
+        for (UINT i = 0; i < NUM_BACK_BUFFERS; i++)
         {
             g_mainRenderTargetDescriptor[i] = rtvHandle;
             rtvHandle.ptr += rtvDescriptorSize;
@@ -212,7 +232,7 @@ bool Window::CreateDeviceD3D()
             return false;
     }
 
-    for (UINT i = 0; i < 3; i++)
+    for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
         if (g_pd3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&g_frameContext[i].CommandAllocator)) != S_OK)
             return false;
 
@@ -238,7 +258,7 @@ bool Window::CreateDeviceD3D()
             return false;
         swapChain1->Release();
         dxgiFactory->Release();
-        g_pSwapChain->SetMaximumFrameLatency(3);
+        g_pSwapChain->SetMaximumFrameLatency(NUM_BACK_BUFFERS);
         g_hSwapChainWaitableObject = g_pSwapChain->GetFrameLatencyWaitableObject();
     }
 
@@ -251,7 +271,7 @@ void Window::CleanupDeviceD3D()
     CleanupRenderTarget();
     if (g_pSwapChain) { g_pSwapChain->SetFullscreenState(false, nullptr); g_pSwapChain->Release(); g_pSwapChain = nullptr; }
     if (g_hSwapChainWaitableObject != nullptr) { CloseHandle(g_hSwapChainWaitableObject); }
-    for (UINT i = 0; i < 3; i++)
+    for (UINT i = 0; i < NUM_FRAMES_IN_FLIGHT; i++)
         if (g_frameContext[i].CommandAllocator) { g_frameContext[i].CommandAllocator->Release(); g_frameContext[i].CommandAllocator = nullptr; }
     if (g_pd3dCommandQueue) { g_pd3dCommandQueue->Release(); g_pd3dCommandQueue = nullptr; }
     if (g_pd3dCommandList) { g_pd3dCommandList->Release(); g_pd3dCommandList = nullptr; }
@@ -271,27 +291,32 @@ void Window::CleanupDeviceD3D()
 #endif
 }
 
+Window::~Window()
+{
+    WaitForLastSubmittedFrame();
+    CleanupImGui();
+    DestroyMainWindow();
+}
+
 LRESULT WINAPI Window::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
         return true;
 
-    auto* main_window = Window::GetInstance();
-
     switch (msg)
     {
     case WM_SIZE:
-        if (main_window->g_pd3dDevice != nullptr && wParam != SIZE_MINIMIZED)
+        if (g_pd3dDevice != nullptr && wParam != SIZE_MINIMIZED)
         {
-            main_window->WaitForLastSubmittedFrame();
-            main_window->CleanupRenderTarget();
-            HRESULT result = main_window->g_pSwapChain->ResizeBuffers(0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT);
+            WaitForLastSubmittedFrame();
+            CleanupRenderTarget();
+            HRESULT result = g_pSwapChain->ResizeBuffers(0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT);
             assert(SUCCEEDED(result) && "Failed to resize swapchain.");
-            main_window->CreateRenderTarget();
+            CreateRenderTarget();
         }
         return 0;
     case WM_SYSCOMMAND:
-        if ((wParam & 0xfff0) == SC_KEYMENU) 
+        if ((wParam & 0xfff0) == SC_KEYMENU) // Disable ALT application menu
             return 0;
         break;
     case WM_DESTROY:
@@ -303,11 +328,10 @@ LRESULT WINAPI Window::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 
 void Window::Run(std::function<bool()> loop_callback)
 {
-	MSG msg;
-	ZeroMemory(&msg, sizeof(msg));
     bool done = false;
-	while (msg.message != WM_QUIT)
+	while (!done)
 	{
+        MSG msg;
         while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
         {
             ::TranslateMessage(&msg);

@@ -1,22 +1,18 @@
+#include <memory>
 #include "Window.h"
-
-#include <chrono>
+#include "DiseaseSimulator.h"
 
 int main(int argc, char* argv[])
 {
-	auto* window = Window::GetInstance(L"Test1");
-	auto start = std::chrono::high_resolution_clock::now();
-
-	window->Run([&]() -> bool
+	auto window = std::make_unique<Window>(L"Disease simulator", ImVec2(1600, 900));
+	auto simulator = std::make_unique<DiseaseSimulator>(DiseaseSimulator::Params
 		{
-			auto end = std::chrono::high_resolution_clock::now();
-			if (end - start > std::chrono::seconds(3))
-			{
-				return true;
-			}
-
-			return false;
+			128,	// Number of entities
+			230,	// Number of rounds
+			150ms	// Round time
 		});
+
+	window->Run([&simulator]() { return simulator->Draw(); });
 
 	return 0;
 }
