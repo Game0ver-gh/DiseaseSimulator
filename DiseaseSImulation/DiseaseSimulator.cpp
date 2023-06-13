@@ -42,14 +42,12 @@ void DiseaseSimulator::RunSimulation()
         if (m_curRound == m_numRounds)
         {
             done = true;
-            tick = 0;
             return;
         }
 
         if (m_curSimStage == 1 && m_entities.empty())
         {
             done = true;
-            tick = 0;
             return;
         }
 
@@ -84,26 +82,18 @@ void DiseaseSimulator::RunSimulation()
                         (entity.m_age >= 30 && entity.m_age < 60) ? 10.0f : 10.0f;
 
                     if (entity.m_state == Entity::HealthState::Infected)
-                    {
                         entity.m_immuneLevel -= 0.1f;
-                        
-                    }
                     else if (entity.m_state == Entity::HealthState::Sick)
-                    {
                         entity.m_immuneLevel -= 0.5f;
-                        
-                    }
                     else if (entity.m_state == Entity::HealthState::Recovering)
                     {
                         entity.m_immuneLevel += 0.1f;
                         entity.m_immuneLevel = std::clamp(entity.m_immuneLevel, 0.f, maxImmune);
-                        
                     }
                     else if (entity.m_state == Entity::HealthState::Healthy)
                     {
                         entity.m_immuneLevel += 0.05f;
                         entity.m_immuneLevel = std::clamp(entity.m_immuneLevel, 0.f, maxImmune);
-                        
                     }
 
                 }
@@ -126,21 +116,13 @@ void DiseaseSimulator::RunSimulation()
 
                 //collecting data
                 if (entity.m_state == Entity::HealthState::Infected)
-                {
                     infected++;
-                }
                 else if (entity.m_state == Entity::HealthState::Sick)
-                {
                     sick++;
-                }
                 else if (entity.m_state == Entity::HealthState::Recovering)
-                {
                     recovering++;
-                }
                 else if (entity.m_state == Entity::HealthState::Healthy)
-                {
                     healthly++;
-                }
             }
 
             m_data_infected_x.push_back(infected);
@@ -148,7 +130,7 @@ void DiseaseSimulator::RunSimulation()
             m_data_recovered_x.push_back(recovering);
             m_data_healthly_x.push_back(healthly);
             m_data_dead_x.push_back(death);
-            m_data_y.push_back(tick);
+            m_data_y.push_back(m_data_y.size());
             m_data_newborn_x.push_back(newBorn);
 
             HandleEntityDeath(deadEntities);
@@ -166,6 +148,14 @@ void DiseaseSimulator::ResetSimulation()
     m_curRound = 0;
     done = false;
     run = false;
+    tick = 0;
+    m_data_infected_x.clear();
+    m_data_sick_x.clear();
+    m_data_recovered_x.clear();
+    m_data_healthly_x.clear();
+    m_data_dead_x.clear();
+    m_data_y.clear();
+    m_data_newborn_x.clear();
 }
 
 void DiseaseSimulator::UpdateScreen()
@@ -217,6 +207,7 @@ std::optional<DiseaseSimulator::Colliders> DiseaseSimulator::HandleEntityCollisi
     bool isCollidingWithOther = false;
     DiseaseSimulator::Colliders colliders;
 
+    //Wall collision
     if (ent.m_pos.x - m_entityDrawRadius < 0)
     {
         ent.m_pos.x = m_entityDrawRadius;
@@ -239,6 +230,7 @@ std::optional<DiseaseSimulator::Colliders> DiseaseSimulator::HandleEntityCollisi
         ent.m_angle = -ent.m_angle;
     }
 
+    //Entity collision
     for (auto& other : m_entities)
     {
         if (&ent == &other) // Skip self
@@ -258,15 +250,17 @@ std::optional<DiseaseSimulator::Colliders> DiseaseSimulator::HandleEntityCollisi
         colliders = { &ent, &other };
 
         // Reflect
-        float collisionAngle = std::atan2(other.m_pos.y - ent.m_pos.y, other.m_pos.x - ent.m_pos.x) * 180.0f / M_PI;
+        float collisionAngle = std::atan2(other.m_pos.y - ent.m_pos.y, other.m_pos.x - ent.m_pos.x) * 180.0f / float(M_PI);
         ent.m_angle = 2.f * collisionAngle - ent.m_angle;
 
+        //Prevent multiple collisions between the same entities in the same tick
         ent.SetColliding(true);
         other.SetColliding(true);
         ent.SetColliderId(other.GetId());
         other.SetColliderId(ent.GetId());
     }
 
+    //Return colliders if there was a collision
     return isCollidingWithOther ? std::make_optional(colliders) : std::nullopt;
 }
 
