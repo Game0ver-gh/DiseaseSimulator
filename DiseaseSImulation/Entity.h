@@ -10,7 +10,7 @@ static ID g_id = 0;
 class Entity
 {
 public:
-	enum class HealthState : int
+	enum class		HealthState : int
 	{
 		Sick = 0,
 		Infected,
@@ -19,7 +19,7 @@ public:
 		Count
 	};
 
-	explicit Entity(const ImVec2& boardDim, float drawSize)
+	explicit		Entity(const ImVec2& boardDim, float drawSize)
 	{
 		m_id = g_id++;
 		m_pos = ImVec2(Utils::Random(drawSize, boardDim.x - drawSize), Utils::Random(drawSize, boardDim.y - drawSize));
@@ -38,7 +38,7 @@ public:
 			(m_age >= 40 && m_age < 70) ? static_cast<float>(Utils::Random(4, 6)) :
 			(m_age >= 30 && m_age < 60) ? static_cast<float>(Utils::Random(7, 10)) : 10.f;
 	}
-	explicit Entity(const ImVec2& boardDim, int age, float drawSize, HealthState state, float immuneLevel) : 
+	explicit		Entity(const ImVec2& boardDim, int age, float drawSize, HealthState state, float immuneLevel) : 
 		m_age(age), m_state(state), m_immuneLevel(immuneLevel), m_preUpdateAge(age), m_id(g_id++)
 	{
 		m_pos = ImVec2(Utils::Random(drawSize, boardDim.x - drawSize), Utils::Random(drawSize, boardDim.y - drawSize));
@@ -51,7 +51,7 @@ public:
 		m_nextState = m_state;
 		UpdateStateTimer();
 	}
-	void Update()
+	void			Update()
 	{
 		++m_age;
 		if (int ageGroup = HasChangedAgeGroup(); ageGroup != -1)

@@ -1,3 +1,6 @@
 *.pch
 *.exe
 *.ipch
+.ipch
+.iph
+.vs

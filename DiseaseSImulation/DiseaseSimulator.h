@@ -27,10 +27,14 @@ private:
 	using Colliders =			std::pair<Entity*, Entity*>;
 
 	void						DrawGrid();
+	void						DrawPlots();
+	void						DrawToolWindow();
 	void 						DrawEntity(const Entity& ent);
 
 	void						RunSimulation();
 	void						ResetSimulation();
+	void						UpdateScreen();
+	void						UpdateTick();
 
 	bool						CreateEntities();
 	const ImColor& 				GetEntityColor(Entity::HealthState state) const;
@@ -63,4 +67,12 @@ private:
 		ImColor(255, 165, 0),	//Recovering
 		ImColor(0, 255, 0)		//Healthly
 	};
+
+	std::vector<int>			m_data_y;
+	std::vector<int>			m_data_healthly_x;
+	std::vector<int>			m_data_infected_x;
+	std::vector<int>			m_data_recovered_x;
+	std::vector<int>			m_data_sick_x;
+	std::vector<int>			m_data_dead_x;
+	std::vector<int>			m_data_newborn_x;
 };

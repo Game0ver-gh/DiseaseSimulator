@@ -116,3 +116,14 @@ namespace ImGui
     void MyFunction(const char* name, const MyMatrix44& v);
 }
 */
+
+struct ImVec2;
+using ImU32 = unsigned int;
+
+namespace ImGui 
+{
+    //https://github.com/ocornut/imgui/issues/1901
+    bool BufferingBar(const char* label, float value, const ImVec2& size_arg, const ImU32& bg_col, const ImU32& fg_col);
+    bool Spinner(const char* label, float radius, int thickness, const ImU32& color);
+
+} // namespace ImGui

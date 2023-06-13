@@ -8,20 +8,12 @@
 #endif
 #define IMGUI_TOOLWINDOW_FLAGS (ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar)
 #define IMGUI_PLOTWINDOW_FLAGS (ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar)
+#define MAX_ENTITIES 2000
 #pragma warning (disable : 4267) //conversion from size_t to int
 
 static bool run = false;
 static bool done = false;
 static bool randomInitialAge = true;
-
-//Data
-std::vector<int> data_y;
-std::vector<int> data_healthly_x; 
-std::vector<int> data_infected_x; 
-std::vector<int> data_recovered_x;
-std::vector<int> data_sick_x; 
-std::vector<int> data_dead_x; 
-std::vector<int> data_newborn_x;
 
 unsigned long long int tick = 0;
 
@@ -38,7 +30,7 @@ DiseaseSimulator::DiseaseSimulator(const Params& params) : m_toolWindowWidth(400
     m_bornChance = 50;
 
     auto& io = ImGui::GetIO();
-    auto font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\Tahoma.ttf", 24.0f);
+    auto font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\Tahoma.ttf", 22.0f);
     if (font) io.FontDefault = font;
 }
 
@@ -151,13 +143,13 @@ void DiseaseSimulator::RunSimulation()
                 }
             }
 
-            data_infected_x.push_back(infected);
-            data_sick_x.push_back(sick);
-            data_recovered_x.push_back(recovering);
-            data_healthly_x.push_back(healthly);
-            data_dead_x.push_back(death);
-            data_y.push_back(tick);
-            data_newborn_x.push_back(newBorn);
+            m_data_infected_x.push_back(infected);
+            m_data_sick_x.push_back(sick);
+            m_data_recovered_x.push_back(recovering);
+            m_data_healthly_x.push_back(healthly);
+            m_data_dead_x.push_back(death);
+            m_data_y.push_back(tick);
+            m_data_newborn_x.push_back(newBorn);
 
             HandleEntityDeath(deadEntities);
         }
@@ -174,6 +166,19 @@ void DiseaseSimulator::ResetSimulation()
     m_curRound = 0;
     done = false;
     run = false;
+}
+
+void DiseaseSimulator::UpdateScreen()
+{
+    m_drawList = ImGui::GetBackgroundDrawList();
+    m_displaySize = ImGui::GetIO().DisplaySize;
+    m_simBoardSize = ImVec2(m_displaySize.x - m_toolWindowWidth, m_displaySize.y);
+}
+
+void DiseaseSimulator::UpdateTick()
+{
+    if (tick++ >= std::numeric_limits<unsigned long long int>::max())
+        tick = 0;
 }
 
 bool DiseaseSimulator::CreateEntities()
@@ -267,6 +272,9 @@ std::optional<DiseaseSimulator::Colliders> DiseaseSimulator::HandleEntityCollisi
 
 void DiseaseSimulator::HandleEntityBorn(const Colliders& colliders, uint32_t* newBornCount)
 {
+    if (m_entities.size() >= MAX_ENTITIES) // Max entities
+        return;
+
     bool ifHerAgeAintOnTheClockShesReadyForTheCock =
         colliders.first->m_age >= 20 && colliders.first->m_age <= 40 &&
         colliders.second->m_age >= 20 && colliders.second->m_age <= 40;
@@ -414,85 +422,18 @@ void DiseaseSimulator::HandleEntityDeath(const std::vector<int>& deadEnts)
 
 bool DiseaseSimulator::Draw()
 {
-    m_drawList = ImGui::GetBackgroundDrawList();
-    m_displaySize = ImGui::GetIO().DisplaySize;
-    m_simBoardSize = ImVec2(m_displaySize.x - m_toolWindowWidth, m_displaySize.y);
+    UpdateScreen();
 
-    ImGui::SetNextWindowSize(ImVec2(m_toolWindowWidth, m_displaySize.y));
-    ImGui::SetNextWindowPos(ImVec2(m_displaySize.x - m_toolWindowWidth, 0));
-    ImGui::Begin("##Sim", nullptr, IMGUI_TOOLWINDOW_FLAGS);
-    {
-        const auto offset = ImGui::GetStyle().ItemSpacing.x;
-        static const std::string btnText[2] = { "Run simulation", "Stop simulation" };
-
-        ImGui::PushStyleColor(ImGuiCol_Text, run ? ImVec4(1.f, 0.2f, 0.2f, 1.f) : ImVec4(0.2f, 1.f, 0.2f, 1.f));
-        if (ImGui::Button(
-            run ? btnText[1].c_str() : btnText[0].c_str(), 
-            ImVec2(ImGui::GetWindowWidth() - offset * 2.f, 0.f)))
-            run = !run;
-        ImGui::PopStyleColor();
-        
-        if (ImGui::Button("Reset simulation", ImVec2(ImGui::GetWindowWidth() - offset * 2.f, 0.f)))
-            ResetSimulation();
-
-        ImGui::Separator();
-        static int roundTime = m_roundTime.count();
-
-        ImGui::SliderInt("Max rounds", &m_numRounds, 100, 500);
-        ImGui::SliderInt("Round time", &roundTime, 1, 100, "%dms");
-        ImGui::SliderInt("Born chance", &m_bornChance, 0, 100, "%d%%");
-
-        m_roundTime = std::chrono::milliseconds(uint32_t(roundTime));
-        ImGui::Separator();
-
-        ImGui::Text("Simulation initial parameters:");
-        ImGui::Text("Entities to spawn: %d", m_numEntities);
-        ImGui::Text("Max rounds: %d", m_numRounds);
-        ImGui::Text("Random entity age: %s", randomInitialAge ? "true" : "false");
-
-        ImGui::Separator();
-
-        ImGui::Text("Current simulation state:");
-        ImGui::Text("Entities on board: %d", m_entities.size());
-		ImGui::Text("Round: %d / %d", m_curRound, m_numRounds);
-    }
-    ImGui::End();
+    DrawToolWindow();
 
     if (run && done)
-    {
-        ImGui::SetNextWindowPos(ImVec2(0.f, 0.f));
-        ImGui::SetNextWindowSize({ m_displaySize.x - m_toolWindowWidth, m_displaySize.y });
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.f, 0.f, 0.f, 1.f));
-        ImGui::Begin("##plots", nullptr, IMGUI_PLOTWINDOW_FLAGS);
-
-        //plots
-        if (ImPlot::BeginPlot("Entity states in every tick", ImVec2(-1.f, -1.f)))
-        {
-            ImPlot::PlotLine("Healthly", 
-                data_y.data(), data_healthly_x.data(), data_y.size());
-            ImPlot::PlotLine("Infected",
-                data_y.data(), data_infected_x.data(), data_y.size());
-            ImPlot::PlotLine("Recovering",
-                data_y.data(), data_recovered_x.data(), data_y.size());
-            ImPlot::PlotLine("Sick",
-                data_y.data(), data_sick_x.data(), data_y.size());
-            ImPlot::PlotLine("Deaths",
-                data_y.data(), data_dead_x.data(), data_y.size());
-            ImPlot::PlotLine("Newborn",
-                data_y.data(), data_newborn_x.data(), data_y.size());
-
-            ImPlot::EndPlot();
-        }
-
-        ImGui::End();
-        ImGui::PopStyleColor();
-    }
+        DrawPlots();
     
     DrawGrid();
     
     RunSimulation();
 
-    tick++;
+    UpdateTick();
 
     return false;
 }
@@ -508,6 +449,96 @@ void DiseaseSimulator::DrawGrid()
         ImVec2(0, 0),
         m_simBoardSize,
         ImColor(255, 255, 255, 255));
+}
+
+void DiseaseSimulator::DrawPlots()
+{
+    ImGui::SetNextWindowPos(ImVec2(0.f, 0.f));
+    ImGui::SetNextWindowSize({ m_displaySize.x - m_toolWindowWidth, m_displaySize.y });
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.f, 0.f, 0.f, 1.f));
+    ImGui::Begin("##plots", nullptr, IMGUI_PLOTWINDOW_FLAGS);
+    auto Plot = [this](const char* label, const std::vector<int>& data)
+    {
+        ImPlot::PlotLine(label, m_data_y.data(), data.data(), (int)data.size());
+    };
+
+    if (ImPlot::BeginPlot("Entity states in every tick", ImVec2(-1.f, -1.f)))
+    {
+        Plot("Healthly", m_data_healthly_x);
+        Plot("Infected", m_data_infected_x);
+        Plot("Recovering", m_data_recovered_x);
+        Plot("Sick", m_data_sick_x);
+        Plot("Deaths", m_data_dead_x);
+        Plot("Newborn", m_data_newborn_x);
+
+        ImPlot::EndPlot();
+    }
+
+    ImGui::End();
+    ImGui::PopStyleColor();
+}
+
+void DiseaseSimulator::DrawToolWindow()
+{
+    ImGui::SetNextWindowSize(ImVec2(m_toolWindowWidth, m_displaySize.y));
+    ImGui::SetNextWindowPos(ImVec2(m_displaySize.x - m_toolWindowWidth, 0));
+    ImGui::Begin("##Sim", nullptr, IMGUI_TOOLWINDOW_FLAGS);
+    {
+        const auto offset = ImGui::GetStyle().ItemSpacing.x;
+        static const std::string btnText[2] = { "Run simulation", "Stop simulation" };
+
+        ImGui::PushStyleColor(ImGuiCol_Text, run ? ImVec4(1.f, 0.2f, 0.2f, 1.f) : ImVec4(0.2f, 1.f, 0.2f, 1.f));
+        if (ImGui::Button(
+            run ? btnText[1].c_str() : btnText[0].c_str(),
+            ImVec2(ImGui::GetWindowWidth() - offset * 2.f, 0.f)))
+            run = !run;
+        ImGui::PopStyleColor();
+
+        if (ImGui::Button("Reset simulation", ImVec2(ImGui::GetWindowWidth() - offset * 2.f, 0.f)))
+            ResetSimulation();
+
+        ImGui::Separator();
+        static int roundTime = m_roundTime.count();
+
+        ImGui::SliderInt("Max rounds", &m_numRounds, 100, 500);
+        ImGui::SliderInt("Round time", &roundTime, 1, 100, "%dms");
+        ImGui::SliderInt("Born chance", &m_bornChance, 0, 100, "%d%%");
+
+        m_roundTime = std::chrono::milliseconds(uint32_t(roundTime));
+        ImGui::Separator();
+
+        auto spinnerPos = ImGui::GetCursorPos();
+
+        ImGui::Text("Simulation initial parameters:");
+        ImGui::Text("Entities to spawn: %d", m_numEntities);
+        ImGui::Text("Max rounds: %d", m_numRounds);
+        
+        auto backup = ImGui::GetCursorPos();
+
+        if (run)
+        {
+            ImGui::SetCursorPos({ m_toolWindowWidth - 60.f - 10, spinnerPos.y + (10 / 2) + 2});
+            ImGui::Spinner("##performin_sim", 30, 10, ImGui::GetColorU32(ImGuiCol_ButtonHovered));
+            ImGui::SetCursorPos(backup);
+        }
+
+        ImGui::Separator();
+
+        const float entity_perc = float(m_entities.size()) / float(MAX_ENTITIES);
+
+        const float round_perc = float(m_curRound) / float(m_numRounds);
+        const ImU32 bg = ImGui::GetColorU32(ImGuiCol_Button);
+        const ImU32 ent_perc_col = ImGui::GetColorU32(ImVec4(entity_perc, 1.f - entity_perc, 0.f, 1.f));
+        const ImU32 round_perc_col = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
+
+        ImGui::Text("Current simulation state:");
+        ImGui::Text("%d / %d - Round", m_curRound, m_numRounds);  
+        ImGui::BufferingBar("##round_prog_bar", round_perc, ImVec2(m_toolWindowWidth, 6), bg, round_perc_col);
+
+        ImGui::Text("%d - Entities on board", m_entities.size());
+        ImGui::BufferingBar("##entity_size_prog_bar", entity_perc, ImVec2(m_toolWindowWidth, 6), bg, ent_perc_col);
+    }
+    ImGui::End();
 }
 
 void DiseaseSimulator::DrawEntity(const Entity& ent)

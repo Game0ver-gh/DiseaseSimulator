@@ -139,6 +139,7 @@
   <ItemGroup>
     <ClCompile Include="DiseaseSim.cpp" />
     <ClCompile Include="DiseaseSimulator.cpp" />
+    <ClCompile Include="imgui\imconfig.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />
     <ClCompile Include="imgui\imgui_demo.cpp" />
     <ClCompile Include="imgui\imgui_draw.cpp" />

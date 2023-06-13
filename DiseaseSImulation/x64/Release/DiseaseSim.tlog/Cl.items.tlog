@@ -1,4 +1,6 @@
 C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\DiseaseSim.cpp;C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Release\DiseaseSim.obj
+C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\DiseaseSimulator.cpp;C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Release\DiseaseSimulator.obj
+C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\imgui\imconfig.cpp;C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Release\imconfig.obj
 C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\imgui\imgui.cpp;C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Release\imgui.obj
 C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\imgui\imgui_demo.cpp;C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Release\imgui_demo.obj
 C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\imgui\imgui_draw.cpp;C:\ZUT\Modelowanie\disease-simulation\DiseaseSImulation\x64\Release\imgui_draw.obj
