@@ -15,7 +15,7 @@ static bool run = false;
 static bool done = false;
 static bool randomInitialAge = true;
 
-unsigned long long int tick = 0;
+long long int unsigned tick = 0;
 
 DiseaseSimulator::DiseaseSimulator(const Params& params) : m_toolWindowWidth(400), m_entityDrawRadius(6.f)
 {
@@ -98,7 +98,7 @@ void DiseaseSimulator::RunSimulation()
 
                 }
 
-                HandleEntityMovement(entity);
+                HandleEntityMove(entity);
                 auto colliders = HandleEntityCollision(entity); // O(n^2) :sadge:
                 if (colliders.has_value())
                 {
@@ -190,16 +190,37 @@ const ImColor& DiseaseSimulator::GetEntityColor(Entity::HealthState state) const
     return m_entityStateColors[uint32_t(state)];
 }
 
-void DiseaseSimulator::HandleEntityMovement(Entity& ent)
+int DiseaseSimulator::GetMaxImmuneByAgeGroup(int ageGroup) const
 {
-    ImVec2 displacement1 =
+    return ((ageGroup >= 0 && ageGroup < 15) || (ageGroup >= 70 && ageGroup <= 100)) ? 3.0f :
+        (ageGroup >= 40 && ageGroup < 70) ? 6.0f :
+        (ageGroup >= 30 && ageGroup < 60) ? 10.0f : 10.0f;
+}
+
+int DiseaseSimulator::GetMinImmuneByAgeGroup(int ageGroup) const
+{
+    return ((ageGroup >= 0 && ageGroup < 15) || (ageGroup >= 70 && ageGroup <= 100)) ? 0.0f :
+        (ageGroup >= 40 && ageGroup < 70) ? 3.0f :
+        (ageGroup >= 30 && ageGroup < 60) ? 6.0f : 6.0f;
+}
+
+int DiseaseSimulator::GetAgeGroup(int age) const
+{
+    return ((age >= 0 && age < 15) || (age >= 70 && age <= 100)) ? 0 :
+        (age >= 40 && age < 70) ? 1 :
+        (age >= 30 && age < 60) ? 2 : 2;
+}
+
+void DiseaseSimulator::HandleEntityMove(Entity& ent)
+{
+    ImVec2 displacement =
     {
         ent.m_velocity * std::cosf(ent.m_angle * M_PI / 180.0f),
         ent.m_velocity * std::sinf(ent.m_angle * M_PI / 180.0f),
     };
 
-    ent.m_pos.x += displacement1.x;
-    ent.m_pos.y += displacement1.y;
+    ent.m_pos.x += displacement.x;
+    ent.m_pos.y += displacement.y;
 }
 
 std::optional<DiseaseSimulator::Colliders> DiseaseSimulator::HandleEntityCollision(Entity& ent)
@@ -249,7 +270,7 @@ std::optional<DiseaseSimulator::Colliders> DiseaseSimulator::HandleEntityCollisi
         isCollidingWithOther = true;
         colliders = { &ent, &other };
 
-        // Reflect
+        //Reflect the angle of the entity that collided with another entity
         float collisionAngle = std::atan2(other.m_pos.y - ent.m_pos.y, other.m_pos.x - ent.m_pos.x) * 180.0f / float(M_PI);
         ent.m_angle = 2.f * collisionAngle - ent.m_angle;
 
@@ -269,13 +290,13 @@ void DiseaseSimulator::HandleEntityBorn(const Colliders& colliders, uint32_t* ne
     if (m_entities.size() >= MAX_ENTITIES) // Max entities
         return;
 
-    bool ifHerAgeAintOnTheClockShesReadyForTheCock =
+    bool canBorn =
         colliders.first->m_age >= 20 && colliders.first->m_age <= 40 &&
         colliders.second->m_age >= 20 && colliders.second->m_age <= 40;
 
-    if (ifHerAgeAintOnTheClockShesReadyForTheCock && Utils::Random(0, 100) < m_bornChance)
+    if (canBorn && Utils::Random(0, 100) < m_bornChance)
     {
-        bool twins = Utils::Random(0, 100) == 1;
+        bool twins = Utils::Random(0, 100) == 1; // 1% chance of twins
         int children = twins ? 2 : 1;
         *newBornCount = children;
         for (size_t i = 0; i < children; i++)
@@ -298,30 +319,14 @@ void DiseaseSimulator::HandleEntityInfection(const Colliders& colliders)
     auto& first = *colliders.first;
     auto& second = *colliders.second;
 
-    auto GetMaxImmunyByAgeGroup = [](int age) -> float
-    {
-        return ((age >= 0 && age < 15) || (age >= 70 && age <= 100)) ? 3.0f :
-            (age >= 40 && age < 70) ? 6.0f :
-            (age >= 30 && age < 60) ? 10.0f : 10.0f;
-    };
-    auto GetMinImmunyByAgeGroup = [](int age) -> float
-    {
-        return ((age >= 0 && age < 15) || (age >= 70 && age <= 100)) ? 0.0f :
-            (age >= 40 && age < 70) ? 3.0f :
-            (age >= 30 && age < 60) ? 6.0f : 6.0f;
-    };
-    auto GetAgeGroup = [](int age) -> int
-    {
-        return ((age >= 0 && age < 15) || (age >= 70 && age <= 100)) ? 0 :
-            (age >= 40 && age < 70) ? 1 :
-            (age >= 30 && age < 60) ? 2 : 2;
-    };
-
+    // Healthly meets infected
     if (first.m_state == State::Healthy && second.m_state == State::Infected)
     {
         if (first.m_immuneLevel > 0.0f && first.m_immuneLevel <= 3.0f)
             first.m_state = State::Infected;
     }
+
+    // Healthly meets sick
     else if (first.m_state == State::Healthy && second.m_state == State::Sick)
     {
         if (first.m_immuneLevel > 0.0f && first.m_immuneLevel <= 6.0f)
@@ -329,12 +334,17 @@ void DiseaseSimulator::HandleEntityInfection(const Colliders& colliders)
         else if (first.m_immuneLevel > 6.0f && first.m_immuneLevel <= 10.0f)
             first.m_immuneLevel -= 3.0f;
 	}
+
+    // Healthly meets recovering
     else if (first.m_state == State::Healthy && second.m_state == State::Recovering)
     {
         second.m_immuneLevel += 1.0f;
     }
+
+    // Healthly meets healthy
     else if (first.m_state == State::Healthy && second.m_state == State::Healthy)
     {
+        // If both are healthy, the immune level of the oldest one is kept
         if (first.m_immuneLevel < second.m_immuneLevel)
         {
             int ageGroupFirst = GetAgeGroup(first.m_age);
@@ -343,7 +353,7 @@ void DiseaseSimulator::HandleEntityInfection(const Colliders& colliders)
             if (ageGroupFirst == ageGroupSecond)
                 first.m_immuneLevel = std::max(first.m_immuneLevel, second.m_immuneLevel);
             else
-                first.m_immuneLevel = GetMaxImmunyByAgeGroup(first.m_age);
+                first.m_immuneLevel = GetMaxImmuneByAgeGroup(first.m_age);
         }
         else
         {
@@ -353,9 +363,11 @@ void DiseaseSimulator::HandleEntityInfection(const Colliders& colliders)
             if (ageGroupFirst == ageGroupSecond)
                 second.m_immuneLevel = std::max(first.m_immuneLevel, second.m_immuneLevel);
             else
-                second.m_immuneLevel = GetMaxImmunyByAgeGroup(second.m_age);
+                second.m_immuneLevel = GetMaxImmuneByAgeGroup(second.m_age);
         }
     }
+
+    // Sick meets infected
     else if (first.m_state == State::Sick && second.m_state == State::Infected)
     {
         if (second.m_immuneLevel > 0.0f && second.m_immuneLevel <= 6.0f)
@@ -363,11 +375,15 @@ void DiseaseSimulator::HandleEntityInfection(const Colliders& colliders)
 
         first.ResetStateTime();
     }
+
+    // Sick meets recovering
     else if (first.m_state == State::Sick && second.m_state == State::Recovering)
     {
         if (second.m_immuneLevel > 0.0f && second.m_immuneLevel <= 6.0f)
             second.m_state = State::Infected;
     }
+
+    // Sick meets sick
     else if (first.m_state == State::Sick && second.m_state == State::Sick)
     {
         if (first.m_immuneLevel < second.m_immuneLevel)
@@ -378,7 +394,7 @@ void DiseaseSimulator::HandleEntityInfection(const Colliders& colliders)
             if (ageGroupFirst == ageGroupSecond)
                 first.m_immuneLevel = std::min(first.m_immuneLevel, second.m_immuneLevel);
             else
-                first.m_immuneLevel = GetMinImmunyByAgeGroup(first.m_age);
+                first.m_immuneLevel = GetMinImmuneByAgeGroup(first.m_age);
         }
         else
         {
@@ -388,19 +404,23 @@ void DiseaseSimulator::HandleEntityInfection(const Colliders& colliders)
             if (ageGroupFirst == ageGroupSecond)
                 second.m_immuneLevel = std::min(first.m_immuneLevel, second.m_immuneLevel);
             else
-                second.m_immuneLevel = GetMinImmunyByAgeGroup(second.m_age);
+                second.m_immuneLevel = GetMinImmuneByAgeGroup(second.m_age);
         }
 
         first.ResetStateTime();
         second.ResetStateTime();
     }
+
+    // Infected meets recovering
     else if (first.m_state == State::Infected && second.m_state == State::Recovering)
     {
         second.m_immuneLevel -= 1.0f;
     }
+
+    // Recovering meets recovering
     else if (first.m_state == State::Recovering && second.m_state == State::Recovering)
     {
-        //nothing
+        // No actions needed for recovering entities
     }
 }
 
@@ -479,7 +499,7 @@ void DiseaseSimulator::DrawToolWindow()
     ImGui::Begin("##Sim", nullptr, IMGUI_TOOLWINDOW_FLAGS);
     {
         const auto offset = ImGui::GetStyle().ItemSpacing.x;
-        static const std::string btnText[2] = { "Run simulation", "Stop simulation" };
+        static const std::string btnText[2] = { "Run simulation", "Pause simulation" };
 
         ImGui::PushStyleColor(ImGuiCol_Text, run ? ImVec4(1.f, 0.2f, 0.2f, 1.f) : ImVec4(0.2f, 1.f, 0.2f, 1.f));
         if (ImGui::Button(
@@ -509,7 +529,7 @@ void DiseaseSimulator::DrawToolWindow()
         
         auto backup = ImGui::GetCursorPos();
 
-        if (run)
+        if (run and not done)
         {
             ImGui::SetCursorPos({ m_toolWindowWidth - 60.f - 10, spinnerPos.y + (10 / 2) + 2});
             ImGui::Spinner("##performin_sim", 30, 10, ImGui::GetColorU32(ImGuiCol_ButtonHovered));
@@ -541,8 +561,4 @@ void DiseaseSimulator::DrawEntity(const Entity& ent)
         ent.m_pos,
         m_entityDrawRadius,
         GetEntityColor(ent.m_state));
-
-    /*char buff[64];
-        sprintf_s(buff, "%.1f", ent.m_immuneLevel);
-        ImGui::GetForegroundDrawList()->AddText(ent.m_pos, ImColor(255, 255, 255), buff);*/
 }

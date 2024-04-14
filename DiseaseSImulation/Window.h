@@ -40,6 +40,6 @@ private:
 	
 	std::wstring					m_name;
 	ImVec2							m_size;
-	ImVec4							clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+	ImVec4							m_clearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 };
 

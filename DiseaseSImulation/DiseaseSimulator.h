@@ -38,8 +38,11 @@ private:
 
 	bool						CreateEntities();
 	const ImColor& 				GetEntityColor(Entity::HealthState state) const;
+	int							GetMaxImmuneByAgeGroup(int ageGroup) const;
+	int							GetMinImmuneByAgeGroup(int ageGroup) const;
+	int							GetAgeGroup(int age) const;
 
-	void						HandleEntityMovement(Entity& ent);
+	void						HandleEntityMove(Entity& ent);
 	std::optional<Colliders>	HandleEntityCollision(Entity& ent);
 	void						HandleEntityBorn(const Colliders& colliders, uint32_t* newBornCount);
 	void						HandleEntityInfection(const Colliders& colliders);
