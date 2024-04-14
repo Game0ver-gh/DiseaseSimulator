@@ -1,5 +1,0 @@
-Matlab choroba:
-położenie: int
-prędkość: rand(1,3)
-wiek: int
-demos: https://github.com/epezent/implot_demos
