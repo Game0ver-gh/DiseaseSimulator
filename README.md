@@ -7,7 +7,7 @@ The Disease Spread Simulator is a simple C++ program that simulates the spread o
 - **Programming Language:** C++20
 - **Development Environment:** Visual Studio
 - **Graphics Library:** DirectX12
-- **User Interface:** ImGUI
+- **User Interface:** [ImGUI](https://github.com/ocornut/imgui) and [ImPlot](https://github.com/epezent/implot?tab=readme-ov-file)
 
 ## Simulation Rules
 
